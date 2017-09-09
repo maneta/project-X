@@ -1,0 +1,34 @@
+version: 2
+jobs:
+
+  build:
+    working_directory: /opt/project-x
+    docker:
+      - image: perl:5.24
+      - image: postgres:9.6-alpine
+    environment:
+        DB_HOST: localhost
+    steps:
+      - run: cpanm Carton
+
+      - checkout
+
+    # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - dependency-cache-{{ checksum "cpanfile.snapshot" }}
+            # fallback to using the latest cache if no exact match is found
+            - dependency-cache-
+
+      - run:
+          name: Install Dependencies
+          command: carton install
+
+      - save_cache:
+          key: dependency-cache-{{ checksum "cpanfile.snapshot" }}
+          paths:
+            - ./local
+
+      - run:
+          name: Run Tests
+          command: carton exec prove -lv
