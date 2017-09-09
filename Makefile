@@ -10,6 +10,9 @@ RELEASE_VERSION ?= latest
 LOCAL_IMAGE  := $(NAME):$(RELEASE_VERSION)
 REMOTE_IMAGE := $(NAMESPACE)/$(LOCAL_IMAGE)
 
+CIRLE_SHA1 ?= ''
+REMOTE_IMAGE_CI := $(NAMESPACE)/$(NAME):$(CIRCLE_SHA1)
+
 # Environment General Settings
 ENVIRONMENT ?= devel
 SECRETS_URL ?= 'https://www.dropbox.com/s/p9x87ffn19rdr0c/secrets.mk.gpg'
@@ -91,6 +94,10 @@ tag: ## Tag IMAGE_NAME
 
 push: tag ## Push to the docker registry
 	docker push $(REMOTE_IMAGE)
+
+push_ci: 
+	docker tag $(LOCAL_IMAGE) $(REMOTE_IMAGE_CI)
+	docker push $(REMOTE_IMAGE_CI)
 
 pull: ## Pull the docker from the Registry
 	docker pull $(REMOTE_IMAGE)

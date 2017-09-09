@@ -32,3 +32,31 @@ jobs:
       - run:
           name: Run Tests
           command: carton exec prove -lv
+
+      - setup_remote_docker
+
+      - run:
+          name: Install Docker client
+          when: on_success
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "circle-ci" ]; then
+              set -x
+              VER="17.03.0-ce"
+              curl -L -o /tmp/docker-$VER.tgz https://get.docker.com/builds/Linux/x86_64/docker-$VER.tgz
+              tar -xz -C /tmp -f /tmp/docker-$VER.tgz
+              mv /tmp/docker/* /usr/bin
+            else
+              echo "Not master branch so no docker required"
+            fi
+
+      - run:
+          name: Build and Push Docker Image
+          when: on_success
+          shell: /bin/bash
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "circle-ci" ]; then
+              docker login -u ${DOCKER_LOGIN} -p ${DOCKER_PASSWORD}
+              make update push_ci
+            else
+              echo "Not master branch, So no push to DockerHub"
+            fi
