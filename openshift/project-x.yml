@@ -1,0 +1,326 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: project-x
+message: "Barcelona Pm Project-x"
+objects:
+
+#ImageStreams
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: project-x
+    labels:
+      app: project-x
+    annotations:
+      openshift.io/display-name: project-x
+  spec:
+    tags:
+    - name: latest
+      annotations:
+        openshift.io/display-name: project-x (latest)
+      from:
+        kind: ImageStreamTag
+        name: "${PROJECT_X_RELEASE}"
+    - name: "${PROJECT_X_RELEASE}"
+      annotations:
+        openshift.io/display-name: project-x ${PROJECT_X_RELEASE}
+      from:
+        kind: DockerImage
+        name: barcelonapm/project-x:${PROJECT_X_RELEASE}
+
+#Secrets
+- kind: Secret
+  apiVersion: v1
+  stringData:
+    DB_PASS: "${DB_PASS}"
+    OAUTH_GITHUB_KEY: "${OAUTH_GITHUB_KEY}"
+    OAUTH_GITHUB_SECRET: "${OAUTH_GITHUB_SECRET}"
+    OAUTH_FACEBOOK_KEY: "${OAUTH_GITHUB_KEY}"
+    OAUTH_FACEBOOK_SECRET: "${OAUTH_GITHUB_SECRET}"
+    OAUTH_GOOGLE_KEY: "${OAUTH_GITHUB_KEY}"
+    OAUTH_GOOGLE_SECRET: "${OAUTH_GITHUB_SECRET}"
+  metadata:
+    name: project-x
+  type: Opaque
+
+#Project-x Deployment
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    annotations:
+    labels:
+      app: project-x
+    name: project-x
+  spec:
+    replicas: 1
+    selector:
+      app: project-x
+      deploymentconfig: project-x
+    template:
+      metadata:
+        annotations:
+        labels:
+          app: project-x
+          deploymentconfig: project-x
+      spec:
+        containers:
+        - image: " "
+          name: project-x
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          env:
+            - name: ENVIRONMENT
+              value: production
+            - name: DB_HOST
+              value: production
+            - name: DB_USER
+              value: postgres
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: project-x
+                  key: DB_PASS
+            - name: OAUTH_GITHUB_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: project-x
+                  key: OAUTH_GITHUB_KEY
+            - name: OAUTH_GITHUB_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: project-x
+                  key: OAUTH_GITHUB_SECRET
+            - name: OAUTH_FACEBOOK_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: project-x
+                  key: OAUTH_FACEBOOK_KEY
+            - name: OAUTH_FACEBOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: project-x
+                  key: OAUTH_FACEBOOK_SECRET
+            - name: OAUTH_GOOGLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: project-x
+                  key: OAUTH_GOOGLE_KEY
+            - name: OAUTH_GOOGLE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: project-x
+                  key: OAUTH_GOOGLE_SECRET
+          livenessProbe:
+            httpGet:
+              path: /signin
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 10
+            timeoutSeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /signin
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - project-x
+        from:
+          kind: ImageStreamTag
+          name: project-x:latest
+      type: ImageChange
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.alpha.openshift.io/dependencies: '[{"name": "project-x-database", "kind": "Service"}]'
+    labels:
+      app: project-x
+    name: project-x
+  spec:
+    ports:
+    - name: project-x-htpp
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app: project-x
+      deploymentconfig: project-x
+
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: project-x-route
+    labels:
+      app: project-x-route
+  spec:
+    host: project-x.${WILDCARD_DOMAIN}
+    to:
+      kind: Service
+      name: project-x
+    port:
+      targetPort: 8080
+
+#Deployment Postgres
+#- apiVersion: v1
+#  kind: ImageStream
+#  metadata:
+#    name: postgresql
+#  spec:
+#    tags:
+#      - name: '9.6'
+#        from:
+#          kind: DockerImage
+#          name: postgres:9.6-alpine
+
+- apiVersion: "v1"
+  kind: "PersistentVolumeClaim"
+  metadata:
+    name: "postgres-pvc"
+  spec:
+    accessModes:
+      - "ReadWriteOnce"
+    resources:
+      requests:
+        storage: "1Gi"
+
+- kind: DeploymentConfig
+  apiVersion: v1
+  metadata:
+    name: project-x-database
+  spec:
+    strategy:
+      type: Recreate
+    triggers:
+#    - type: ImageChange
+#      imageChangeParams:
+#        automatic: true
+#        containerNames:
+#        - postgresql
+#        from:
+#          kind: ImageStreamTag
+#          name: postgresql:9.6
+    - type: ConfigChange
+    replicas: 1
+    selector:
+      name: "project-x-database"
+    template:
+      metadata:
+        labels:
+          name: "project-x-database"
+      spec:
+        containers:
+        - name: postgresql
+          image: "centos/postgresql-95-centos7"
+          ports:
+          - containerPort: 5432
+            protocol: TCP
+          readinessProbe:
+            timeoutSeconds: 1
+            initialDelaySeconds: 5
+            exec:
+              command:
+              - "/bin/sh"
+              - "-i"
+              - "-c"
+              - psql -h 127.0.0.1 -U postgres -q -d postgres -c 'SELECT 1'
+          livenessProbe:
+            timeoutSeconds: 1
+            initialDelaySeconds: 30
+            tcpSocket:
+              port: 5432
+          env:
+          - name: POSTGRESQL_USER
+            value: postgres
+          - name: POSTGRESQL_DATABASE
+            value: postgres
+          - name: POSTGRESQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: project-x
+                key: DB_PASS
+          volumeMounts:
+          - name: "postgres-pvc"
+            mountPath: "/var/lib/pgsql/data"
+          imagePullPolicy: IfNotPresent
+        volumes:
+          - name: 'postgres-pvc'
+            persistentVolumeClaim:
+              claimName: 'postgres-pvc'
+
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: "project-x-database"
+  spec:
+    ports:
+    - name: postgresql
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
+      nodePort: 0
+    selector:
+      name: "project-x-database"
+
+parameters:
+
+- name: PROJECT_X_RELEASE
+  description: Docker release tag
+  required: true
+  value: "latest"
+
+- name: WILDCARD_DOMAIN
+  description: Wildcard Domain to point to Openshift
+  required: true
+  value: "193b.starter-ca-central-1.openshiftapps.com"
+
+- name: OAUTH_GITHUB_KEY
+  description: Github Oauth Key
+  required: false
+  value: ""
+
+- name: OAUTH_GITHUB_SECRET
+  description: Github Oauth Secret
+  required: false
+  value: ""
+
+- name: OAUTH_FACEBOOK_KEY
+  description: Facebook Oauth Key
+  required: false
+  value: ""
+
+- name: OAUTH_FACEBOOK_SECRET
+  description: Facebook Oauth Secret
+  required: false
+  value: ""
+
+- name: OAUTH_GOOGLE_KEY
+  description: Google Oauth Key
+  required: false
+  value: ""
+
+- name: OAUTH_GOOGLE_SECRET
+  description: Google Oauth Secret
+  required: false
+  value: ""
+
+- name: DB_PASS
+  displayName: PostgreSQL Connection Password
+  description: Password for the PostgreSQL connection user.
+  generate: expression
+  from: "[a-zA-Z0-9]{16}"
+  required: true
