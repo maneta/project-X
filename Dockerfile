@@ -13,7 +13,8 @@ COPY ./ /opt/project-x
 
 RUN groupadd -r xman -g 1001 \
     && useradd -u 1001 -r -g xman -d /opt/project-x/ -s /sbin/nologin -c "Docker image user" xman \
-    && chown -R xman:xman /opt/project-x/
+    && chown -R xman:xman /opt/project-x/ \ 
+    && chmod 0757 /opt/project-x/script/
 
 USER 1001
 EXPOSE 8080
