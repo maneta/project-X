@@ -4,7 +4,7 @@ jobs:
   build:
     working_directory: /opt/project-x
     docker:
-      - image: perl:5.24
+      - image: ianblenke/kvm:latest 
       - image: postgres:9.6-alpine
     environment:
         DB_HOST: localhost
